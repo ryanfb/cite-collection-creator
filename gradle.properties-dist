@@ -1,0 +1,6 @@
+
+coffeesrc=src/js
+
+# Set these properties here, or override the settings on the command
+# line when running a gradle task.
+google_client_id=YOUR_APP_ID_.googleusercontent.com

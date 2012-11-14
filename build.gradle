@@ -1,0 +1,44 @@
+import org.gradle.plugins.javascript.coffeescript.CoffeeScriptCompile
+import org.apache.tools.ant.filters.ReplaceTokens
+
+apply plugin: 'coffeescript-base'
+
+repositories {
+  mavenCentral()
+  mavenRepo name: "Gradle", url: "http://repo.gradle.org/gradle/repo"
+}
+
+task compileCoffee(type: CoffeeScriptCompile) {
+  source fileTree(coffeesrc)
+  include "**/*.coffee"
+  destinationDir file("${buildDir.path}/js")
+}
+
+task filter(type: Copy) {
+  from 'src'
+  into "${buildDir.path}"
+  include "index.html"
+  expand(gradle.properties)
+  filter(ReplaceTokens, tokens: [google_client_id: google_client_id])
+}
+
+task copy(type: Copy) {
+  from 'src'
+  into "${buildDir.path}"
+  include "**/*.html"
+  include "**/*.js"
+  include "**/*.coffee"
+  include "**/*.css"
+  include "**/*.xml"
+  include "**/*.rng"
+  include "**/*.png"
+  include "**/*.swf"
+  exclude "index.html"
+  exclude "js/collection-creator.js"
+}
+
+task build {
+  dependsOn compileCoffee, filter, copy
+  description = "Assemble website from source"
+}
+
