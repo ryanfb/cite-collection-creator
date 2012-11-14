@@ -27,6 +27,17 @@ create_creator_form = ->
   $('#creator_form').append $('<input>').attr('type','file').attr('id','file_input').attr('name','file')
   $('#file_input').change (event) ->
     console.log event.target.files[0].name
+    reader = new FileReader()
+    reader.onerror = (file_event) ->
+      console.log 'file reader error'
+    reader.onload = (file_event) ->
+      console.log 'reader onload fired'
+      console.log file_event.target.result
+      cite_collections = $(file_event.target.result).find('citeCollection')
+      for cite_collection in cite_collections
+        console.log $(cite_collection).attr('name')
+        console.log $(cite_collection).attr('description')
+    reader.readAsText(event.target.files[0])
 
 disable_creator_form = ->
   $('#file_input').prop('disabled',true)
