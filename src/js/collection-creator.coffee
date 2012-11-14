@@ -2,6 +2,8 @@ FUSION_TABLES_URI = 'https://www.googleapis.com/fusiontables/v1'
 
 google_client_id = '891199912324.apps.googleusercontent.com'
 
+constructed_capabilities = $('<collectionService>').attr('xmlns','http://chs.harvard.edu/xmlns/cite/capabilities')
+
 google_oauth_parameters_for_fusion_tables =
   response_type: 'token'
   redirect_uri: window.location.href.replace("#{location.hash}",'')
@@ -33,21 +35,34 @@ create_creator_form = ->
     reader.onload = (file_event) ->
       console.log 'reader onload fired'
       console.log file_event.target.result
+
+      capabilities = $(file_event.target.result)
+      original_capabilities = capabilities.clone()
       
-      for cite_collection in $(file_event.target.result).find('citeCollection')
-        fusion_tables_request = {}
-        fusion_tables_request['name'] = $(cite_collection).attr('name')
-        fusion_tables_request['columns'] = []
-        for cite_property in $(cite_collection).find('citeProperty')
-          column =
-            name: $(cite_property).attr('name')
-            type: cite_property_type_to_fusion_tables_type($(cite_property).attr('type'))
-          fusion_tables_request['columns'].push column
-        fusion_tables_request['description'] = $(cite_collection).attr('description')
-        fusion_tables_request['isExportable'] = 'false'
-        console.log fusion_tables_request
-        console.log JSON.stringify(fusion_tables_request)
-        create_fusion_table(JSON.stringify(fusion_tables_request))
+      for cite_collection in capabilities.find('citeCollection')
+        do (cite_collection) ->
+          collection_callback = (data) ->
+            cite_collection_dom = $(cite_collection)
+            cite_collection_dom.attr('class',data['tableId'])
+            constructed_capabilities.append cite_collection_dom
+            if constructed_capabilities.find('citeCollection').length == original_capabilities.find('citeCollection').length
+              $('#creator_form').append $('<pre style="visibility:hidden">').attr('id','unescaped_pre').append($('<code>').attr('id','unescaped').append(constructed_capabilities))
+              $('#creator_form').append $('<pre>').append($('<code>').attr('id','escaped').append($('<div/>').text($('#unescaped').html()).html()))
+              $('#unescaped_pre').remove()
+
+          fusion_tables_request = {}
+          fusion_tables_request['name'] = $(cite_collection).attr('name')
+          fusion_tables_request['columns'] = []
+          for cite_property in $(cite_collection).find('citeProperty')
+            column =
+              name: $(cite_property).attr('name')
+              type: cite_property_type_to_fusion_tables_type($(cite_property).attr('type'))
+            fusion_tables_request['columns'].push column
+          fusion_tables_request['description'] = $(cite_collection).attr('description')
+          fusion_tables_request['isExportable'] = 'false'
+          console.log fusion_tables_request
+          console.log JSON.stringify(fusion_tables_request)
+          create_fusion_table(JSON.stringify(fusion_tables_request),collection_callback)
     reader.readAsText(event.target.files[0])
 
 create_fusion_table = (request, callback) ->
