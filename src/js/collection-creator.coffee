@@ -33,11 +33,45 @@ create_creator_form = ->
     reader.onload = (file_event) ->
       console.log 'reader onload fired'
       console.log file_event.target.result
-      cite_collections = $(file_event.target.result).find('citeCollection')
-      for cite_collection in cite_collections
-        console.log $(cite_collection).attr('name')
-        console.log $(cite_collection).attr('description')
+      
+      for cite_collection in $(file_event.target.result).find('citeCollection')
+        fusion_tables_request = {}
+        fusion_tables_request['name'] = $(cite_collection).attr('name')
+        fusion_tables_request['columns'] = []
+        for cite_property in $(cite_collection).find('citeProperty')
+          column =
+            name: $(cite_property).attr('name')
+            type: cite_property_type_to_fusion_tables_type($(cite_property).attr('type'))
+          fusion_tables_request['columns'].push column
+        fusion_tables_request['description'] = $(cite_collection).attr('description')
+        fusion_tables_request['isExportable'] = 'false'
+        console.log fusion_tables_request
+        console.log JSON.stringify(fusion_tables_request)
+        create_fusion_table(JSON.stringify(fusion_tables_request))
     reader.readAsText(event.target.files[0])
+
+create_fusion_table = (request, callback) ->
+  $.ajax "#{FUSION_TABLES_URI}/tables?access_token=#{get_cookie 'access_token'}",
+    type: 'POST'
+    dataType: 'json'
+    crossDomain: true
+    contentType: 'application/json'
+    data:
+      request
+    error: (jqXHR, textStatus, errorThrown) ->
+      console.log "AJAX Error: #{textStatus}"
+      $('.container > h1').after $('<div>').attr('class','alert alert-error').append("Error creating table: #{textStatus}")
+    success: (data) ->
+      console.log data
+      if callback?
+        callback(data)
+
+cite_property_type_to_fusion_tables_type = (type) ->
+  switch type
+    when 'datetime', 'timestamp'
+      'DATETIME'
+    else
+      'STRING'
 
 disable_creator_form = ->
   $('#file_input').prop('disabled',true)
