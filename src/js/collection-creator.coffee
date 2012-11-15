@@ -85,6 +85,8 @@ cite_property_type_to_fusion_tables_type = (type) ->
   switch type
     when 'datetime', 'timestamp'
       'DATETIME'
+    when 'number'
+      'NUMBER'
     else
       'STRING'
 
