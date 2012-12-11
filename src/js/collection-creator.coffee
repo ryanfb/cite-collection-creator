@@ -14,56 +14,75 @@ google_oauth_url = ->
   "https://accounts.google.com/o/oauth2/auth?#{$.param(google_oauth_parameters_for_fusion_tables)}"
 
 build_collection_creator = ->
-  create_creator_form()
+  create_creator_selector()
   unless window.File && window.FileReader && window.FileList && window.Blob
     $('.container > h1').after $('<div>').attr('class','alert alert-error').attr('id','html5_files_error').append('Your browser does not support the HTML5 file access APIs')
-    disable_creator_form()
+    disable_creator()
   unless get_cookie 'access_token'
     $('.container > h1').after $('<div>').attr('class','alert alert-warning').attr('id','oauth_access_warning').append('You have not authorized this application to access your Google Fusion Tables. ')
     $('#oauth_access_warning').append $('<a>').attr('href',google_oauth_url()).append('Click here to authorize.')
-    disable_creator_form()
+    disable_creator()
+
+create_creator_selector = ->
+  select = $('<select>').attr('style','width:100%').attr('id','creator_select')
+  select.append $('<option>').attr('value','upload').append('Create Fusion Tables from existing capabilities XML file')
+  select.append $('<option>').attr('value','convert').append('Create capabilities XML from existing Fusion Table')
+  select.append $('<option>').attr('value','create').append('Interactively create collection capabilities')
+  $('.container').append select
+  select.change (event) ->
+    create_creator_form()
+  select.change()
 
 create_creator_form = ->
-  $('.container > h1').after $('<div>').attr('id','creator_form')
-  $('#creator_form').append $('<p>').append('Select a collections capabilities file below.')
-  $('#creator_form').append $('<input>').attr('type','file').attr('id','file_input').attr('name','file')
-  $('#file_input').change (event) ->
-    console.log event.target.files[0].name
-    reader = new FileReader()
-    reader.onerror = (file_event) ->
-      console.log 'file reader error'
-    reader.onload = (file_event) ->
-      console.log 'reader onload fired'
-      console.log file_event.target.result
+  $('#creator_form').remove()
+  creator_selected = $('#creator_select option:selected')[0]
+  if creator_selected?
+    switch $(creator_selected).attr('value')
+      when 'convert'
+        $('.container').append $('<div>').attr('id','creator_form')
+        $('#creator_form').append $('<label>').attr('for','encrypted_id').attr('style','display:inline').append('Encrypted table id:')
+        $('#creator_form').append $('<input>').attr('id','encrypted_id')
+      when 'upload'
+        $('.container').append $('<div>').attr('id','creator_form')
+        $('#creator_form').append $('<p>').append('Select a collections capabilities file below.')
+        $('#creator_form').append $('<input>').attr('type','file').attr('id','file_input').attr('name','file')
+        $('#file_input').change (event) ->
+          console.log event.target.files[0].name
+          reader = new FileReader()
+          reader.onerror = (file_event) ->
+            console.log 'file reader error'
+          reader.onload = (file_event) ->
+            console.log 'reader onload fired'
+            console.log file_event.target.result
 
-      capabilities = $(file_event.target.result)
-      original_capabilities = capabilities.clone()
-      
-      for cite_collection in capabilities.find('citeCollection')
-        do (cite_collection) ->
-          collection_callback = (data) ->
-            cite_collection_dom = $(cite_collection)
-            cite_collection_dom.attr('class',data['tableId'])
-            constructed_capabilities.append cite_collection_dom
-            if constructed_capabilities.find('citeCollection').length == original_capabilities.find('citeCollection').length
-              $('#creator_form').append $('<pre style="visibility:hidden">').attr('id','unescaped_pre').append($('<code>').attr('id','unescaped').append(constructed_capabilities))
-              $('#creator_form').append $('<pre>').append($('<code>').attr('id','escaped').append($('<div/>').text($('#unescaped').html()).html()))
-              $('#unescaped_pre').remove()
+            capabilities = $(file_event.target.result)
+            original_capabilities = capabilities.clone()
+            
+            for cite_collection in capabilities.find('citeCollection')
+              do (cite_collection) ->
+                collection_callback = (data) ->
+                  cite_collection_dom = $(cite_collection)
+                  cite_collection_dom.attr('class',data['tableId'])
+                  constructed_capabilities.append cite_collection_dom
+                  if constructed_capabilities.find('citeCollection').length == original_capabilities.find('citeCollection').length
+                    $('#creator_form').append $('<pre style="visibility:hidden">').attr('id','unescaped_pre').append($('<code>').attr('id','unescaped').append(constructed_capabilities))
+                    $('#creator_form').append $('<pre>').append($('<code>').attr('id','escaped').append($('<div/>').text($('#unescaped').html()).html()))
+                    $('#unescaped_pre').remove()
 
-          fusion_tables_request = {}
-          fusion_tables_request['name'] = $(cite_collection).attr('name')
-          fusion_tables_request['columns'] = []
-          for cite_property in $(cite_collection).find('citeProperty')
-            column =
-              name: $(cite_property).attr('name')
-              type: cite_property_type_to_fusion_tables_type($(cite_property).attr('type'))
-            fusion_tables_request['columns'].push column
-          fusion_tables_request['description'] = $(cite_collection).attr('description')
-          fusion_tables_request['isExportable'] = 'false'
-          console.log fusion_tables_request
-          console.log JSON.stringify(fusion_tables_request)
-          create_fusion_table(JSON.stringify(fusion_tables_request),collection_callback)
-    reader.readAsText(event.target.files[0])
+                fusion_tables_request = {}
+                fusion_tables_request['name'] = $(cite_collection).attr('name')
+                fusion_tables_request['columns'] = []
+                for cite_property in $(cite_collection).find('citeProperty')
+                  column =
+                    name: $(cite_property).attr('name')
+                    type: cite_property_type_to_fusion_tables_type($(cite_property).attr('type'))
+                  fusion_tables_request['columns'].push column
+                fusion_tables_request['description'] = $(cite_collection).attr('description')
+                fusion_tables_request['isExportable'] = 'false'
+                console.log fusion_tables_request
+                console.log JSON.stringify(fusion_tables_request)
+                create_fusion_table(JSON.stringify(fusion_tables_request),collection_callback)
+          reader.readAsText(event.target.files[0])
 
 create_fusion_table = (request, callback) ->
   $.ajax "#{FUSION_TABLES_URI}/tables?access_token=#{get_cookie 'access_token'}",
@@ -90,7 +109,16 @@ cite_property_type_to_fusion_tables_type = (type) ->
     else
       'STRING'
 
-disable_creator_form = ->
+fusion_tables_type_to_cite_property_types = (type) ->
+  switch type
+    when 'DATETIME'
+      ['datetime','timestamp']
+    when 'NUMBER'
+      ['number']
+    else
+      ['string','citeurn','ctsurn','citeimg','markdown','authuser','boolean']
+
+disable_creator = ->
   $('#file_input').prop('disabled',true)
 
 # parse URL hash parameters into an associative array object
